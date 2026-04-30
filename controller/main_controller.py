@@ -11,6 +11,9 @@ class MainController:
         if hasattr(self, 'view') and hasattr(self.view, 'btn_segment'):
             self.view.btn_segment.configure(command=self.open_segmentation_menu)
 
+        if hasattr(self.view, 'btn_library'):
+            self.view.btn_library.configure(command=self.open_library)
+
     def open_segmentation_menu(self):
         from view.segmentation_window import AudioUploadWindow
         self.seg_win = AudioUploadWindow(self.view)
@@ -102,6 +105,8 @@ class MainController:
         self.editor.play_segment_btn.configure(command=self.play_selected_segment)
 
         self.editor.recalc_btn.configure(command=self.handle_resegmentation)
+
+        self.editor.save_btn.configure(command=self.save_current_project)
 
     def toggle_playback(self):
         import pygame
@@ -238,6 +243,7 @@ class MainController:
             self.editor.play_pause_btn.configure(text="▶")
             # Оновлюємо current_seconds на кінець сегмента
             # (або можна лишити на початку - як тобі зручніше)
+
     def handle_resegmentation(self):
         """Перерахунок сегментів іншим методом без закриття вікна"""
         # Зупиняємо плеєр перед перерахунком, щоб не було конфліктів
@@ -262,3 +268,115 @@ class MainController:
         ]
         
         self.editor._refresh_all()
+
+    def save_current_project(self):
+        """Зберігає поточні сегменти у JSON файл"""
+        import json
+        import os
+        from tkinter import messagebox
+
+        if not hasattr(self.model, 'current_path') or not self.model.current_path:
+            messagebox.showwarning("Помилка", "Немає даних для збереження")
+            return
+
+        # Створюємо структуру даних
+        data_to_save = {
+            "project_name": os.path.basename(self.model.current_path),
+            "audio_path": self.model.current_path,
+            "segments": self.editor.segments,
+            "last_modified": time.strftime("%Y-%m-%d %H:%M:%S")
+        }
+
+        # Створюємо папку library, якщо її немає
+        if not os.path.exists("library"):
+            os.makedirs("library")
+
+        # Формуємо шлях до файлу
+        file_base = os.path.basename(self.model.current_path).rsplit('.', 1)[0]
+        save_path = os.path.join("library", f"{file_base}_project.json")
+
+        try:
+            with open(save_path, "w", encoding="utf-8") as f:
+                json.dump(data_to_save, f, indent=4, ensure_ascii=False)
+            messagebox.showinfo("Успіх", f"Проект збережено в папку library!")
+        except Exception as e:
+            messagebox.showerror("Помилка", f"Не вдалося зберегти: {e}")
+
+    def open_library(self):
+        """Зчитує JSON-файли та передає їх у LibraryWindow"""
+        import os
+        import json
+        from view.library_view import LibraryWindow
+
+        library_path = "library"
+        real_saved_tracks = []
+
+        if os.path.exists(library_path):
+            files = [f for f in os.listdir(library_path) if f.endswith('.json')]
+            for index, file_name in enumerate(files):
+                try:
+                    with open(os.path.join(library_path, file_name), "r", encoding="utf-8") as f:
+                        data = json.load(f)
+                        real_saved_tracks.append({
+                            "id": index,
+                            "name": data.get("project_name", file_name),
+                            "date": data.get("last_modified", "Невідомо"),
+                            "segments": len(data.get("segments", [])),
+                            "full_data": data 
+                        })
+                except Exception as e:
+                    print(f"Помилка: {e}")
+
+        # Створюємо вікно та ОНОВЛЮЄМО його дані
+        self.lib_win = LibraryWindow(self.view)
+        self.lib_win.saved_tracks = real_saved_tracks # Передаємо реальні дані замість заглушок
+        self.lib_win.render_library() # Викликаємо перемальовування карток
+        self.view.withdraw()
+
+        # Кажемо вікну бібліотеки: "Коли захочеш завантажити проект — клич цей метод контролера"
+        self.lib_win.load_project_to_editor = self.load_saved_project
+
+    def load_saved_project(self, track_item):
+        """Відкриває збережений проект з бібліотеки в редакторі"""
+        import os
+        from tkinter import messagebox
+        from model.audio_model import Segment
+
+        # Отримуємо ПОВНІ дані проекту з об'єкта, який передала бібліотека
+        project_data = track_item.get("full_data")
+        if not project_data:
+            messagebox.showerror("Помилка", "Дані проекту не знайдено.")
+            return
+
+        # 1. Дістаємо шлях до аудіо
+        audio_path = project_data.get("audio_path")
+        
+        if not audio_path or not os.path.exists(audio_path):
+            messagebox.showerror("Помилка", f"Аудіофайл не знайдено за шляхом:\n{audio_path}")
+            return
+
+        # 2. Завантажуємо аудіо в модель
+        if self.model.load_from_file(audio_path):
+            self.model.current_path = audio_path
+            
+            # 3. Завантажуємо сегменти (тепер беремо СПИСОК із JSON)
+            segments_list = project_data.get("segments", [])
+            
+            # Перетворюємо словники з JSON назад у об'єкти класу Segment
+            self.model.segments = []
+            for s in segments_list:
+                # Перевірка на випадок, якщо дані збережені як об'єкти або словники
+                start = float(s.get('start', 0)) if isinstance(s, dict) else float(s.start)
+                end = float(s.get('end', 0)) if isinstance(s, dict) else float(s.end)
+                label = s.get('label', "PART") if isinstance(s, dict) else s.label
+                
+                self.model.segments.append(Segment(start=start, end=end, label=label))
+            
+            # 4. Закриваємо вікно бібліотеки та відкриваємо редактор
+            if hasattr(self, 'lib_win'):
+                self.lib_win.destroy()
+                
+            self.view.withdraw() 
+            self.open_editor()
+        else:
+            messagebox.showerror("Помилка", "Не вдалося завантажити аудіо.")

@@ -103,17 +103,34 @@ class LibraryWindow(ctk.CTkToplevel):
     def create_track_card(self, track):
         card = ctk.CTkFrame(self.scrollable_frame, fg_color=self.card_color, corner_radius=12)
         card.pack(fill="x", pady=5, padx=5)
+        
         var = ctk.BooleanVar()
         self.check_vars[track['id']] = var
+        
         checkbox = ctk.CTkCheckBox(card, text="", variable=var, width=20, fg_color=self.accent_color)
         checkbox.pack(side="left", padx=15)
+        
         info_frame = ctk.CTkFrame(card, fg_color="transparent")
         info_frame.pack(side="left", fill="y", pady=10)
+        
         ctk.CTkLabel(info_frame, text=track['name'], font=ctk.CTkFont(size=16, weight="bold"), text_color=self.text_white).pack(anchor="w")
         ctk.CTkLabel(info_frame, text=f"Дата: {track['date']} | Сегментів: {track['segments']}", font=ctk.CTkFont(size=12), text_color=self.text_gray).pack(anchor="w")
-        btn_view = ctk.CTkButton(card, text="Переглянути", width=100, fg_color="#3d3d3d", text_color="white", command=lambda n=track['name']: print(f"Перегляд {n}"))
+        
+        # ОНОВЛЕНА КНОПКА: вона має викликати метод відкриття в контролері
+        btn_view = ctk.CTkButton(
+            card, 
+            text="Відкрити", 
+            width=100, 
+            fg_color="#3d3d3d", 
+            command=lambda t=track: self.load_project_to_editor(t)
+        )
         btn_view.pack(side="right", padx=20)
 
+    def load_project_to_editor(self, track_data):
+        """Це заглушка, яку контролер замінить на реальний метод"""
+        # Якщо контролер не підмінив цей метод, просто виведемо інфо
+        print(f"Завантаження проекту: {track_data['name']}")
+        
     def select_all(self):
         for var in self.check_vars.values(): var.set(True)
 
