@@ -204,6 +204,10 @@ class SegmentedTrackView(ctk.CTkToplevel):
 
         self.canvas = FigureCanvasTkAgg(self.fig, master=self.graph_frame)
         self.canvas.get_tk_widget().pack(fill="both", expand=True)
+        # Дозволяємо графіку реагувати на мишку
+        self.canvas.mpl_connect('button_press_event', self._on_click)
+        self.canvas.mpl_connect('button_release_event', self._on_release)
+        self.canvas.mpl_connect('motion_notify_event', self._on_motion)
         self.canvas.draw()
 
     def _refresh_all(self):
@@ -268,3 +272,5 @@ class SegmentedTrackView(ctk.CTkToplevel):
 
     def _on_play_segment_click(self):
         pass
+
+    

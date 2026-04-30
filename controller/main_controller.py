@@ -52,7 +52,7 @@ class MainController:
         else:
             messagebox.showerror("Помилка", "Не вдалося завантажити файл.")
             self.seg_win.run_btn.configure(text="🚀 СЕГМЕНТУВАТИ", state="normal")
-            
+
     def open_editor(self):
         """Створює і наповнює вікно редактора з робочим плеєром та перемоткою"""
         import pygame
@@ -100,6 +100,8 @@ class MainController:
         self.update_slider_loop()
 
         self.editor.play_segment_btn.configure(command=self.play_selected_segment)
+
+        self.editor.recalc_btn.configure(command=self.handle_resegmentation)
 
     def toggle_playback(self):
         import pygame
@@ -236,3 +238,27 @@ class MainController:
             self.editor.play_pause_btn.configure(text="▶")
             # Оновлюємо current_seconds на кінець сегмента
             # (або можна лишити на початку - як тобі зручніше)
+    def handle_resegmentation(self):
+        """Перерахунок сегментів іншим методом без закриття вікна"""
+        # Зупиняємо плеєр перед перерахунком, щоб не було конфліктів
+        import pygame
+        if pygame.mixer.get_init():
+            pygame.mixer.music.stop()
+        self.is_playing = False
+        self.editor.play_pause_btn.configure(text="▶")
+
+        method = self.editor.method_var.get()
+        
+        if "Librosa" in method:
+            self.model.segment_librosa_onset()
+        elif "Novelty" in method:
+            self.model.segment_novelty()
+        else:
+            self.model.segment_novelty()
+
+        self.editor.segments = [
+            {"start": s.start, "end": s.end, "label": s.label}
+            for s in self.model.segments
+        ]
+        
+        self.editor._refresh_all()
