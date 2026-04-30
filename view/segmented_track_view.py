@@ -90,6 +90,13 @@ class SegmentedTrackView(ctk.CTkToplevel):
         )
         self.add_btn.pack(pady=10, padx=20, fill="x")
 
+        self.play_segment_btn = ctk.CTkButton(
+            self.sidebar, text="▶ PLAY SELECTED", fg_color="#2ecc71", hover_color="#27ae60",
+            text_color="white", font=("Arial", 13, "bold"),
+            command=self._on_play_segment_click # Будемо прив'язувати в контролері
+        )
+        self.play_segment_btn.pack(pady=10, padx=20, fill="x")
+
         # Кнопка Назад (розміщуємо внизу сайдбару)
         self.back_to_menu_btn = ctk.CTkButton(
             self.sidebar, 
@@ -172,28 +179,31 @@ class SegmentedTrackView(ctk.CTkToplevel):
             self.canvas.get_tk_widget().destroy()
 
         self.fig, self.ax = plt.subplots(figsize=(10, 3), facecolor=self.panel_color)
-        self.fig.subplots_adjust(bottom=0.15, top=0.9, left=0.05, right=0.95)
+        self.fig.subplots_adjust(bottom=0.2, top=0.9, left=0.05, right=0.95)
         
         if signal is not None and sr is not None:
             import librosa.display
+            import matplotlib.ticker as ticker
+            
             D = librosa.amplitude_to_db(np.abs(librosa.stft(signal)), ref=np.max)
+            # x_axis=None, щоб вручну керувати шкалою
             librosa.display.specshow(D, sr=sr, x_axis='time', y_axis='hz', ax=self.ax, cmap='magma')
+            
+            # --- ОЦЕЙ БЛОК РОБИТЬ СЕКУНДИ ---
+            self.ax.xaxis.set_major_formatter(ticker.FormatStrFormatter('%.2f')) # 2 знаки після коми
+            self.ax.set_xlabel("Time (s)", color=self.text_color)
+            # -------------------------------
+            
             self.duration = len(signal) / sr
         else:
-            data = np.random.rand(100, 500)
-            self.ax.imshow(data, aspect='auto', cmap='magma', extent=[0, 100, 0, 8000])
+            self.ax.set_xlim(0, 100)
             self.duration = 100
 
         self.ax.set_facecolor(self.panel_color)
-        self.ax.tick_params(colors='#888', labelsize=8)
+        self.ax.tick_params(colors='#888', labelsize=9)
 
         self.canvas = FigureCanvasTkAgg(self.fig, master=self.graph_frame)
         self.canvas.get_tk_widget().pack(fill="both", expand=True)
-
-        self.canvas.mpl_connect('button_press_event', self._on_click)
-        self.canvas.mpl_connect('button_release_event', self._on_release)
-        self.canvas.mpl_connect('motion_notify_event', self._on_motion)
-        
         self.canvas.draw()
 
     def _refresh_all(self):
@@ -254,4 +264,7 @@ class SegmentedTrackView(ctk.CTkToplevel):
             self.canvas.draw()
 
     def _on_slider_drag(self, value):
+        pass
+
+    def _on_play_segment_click(self):
         pass

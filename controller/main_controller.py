@@ -92,6 +92,8 @@ class MainController:
         # 9. Запускаємо фоновий цикл оновлення слайдера
         self.update_slider_loop()
 
+        self.editor.play_segment_btn.configure(command=self.play_selected_segment)
+
     def toggle_playback(self):
         import pygame
         if not self.is_playing:
@@ -108,7 +110,7 @@ class MainController:
             pygame.mixer.music.stop()
             self.editor.play_pause_btn.configure(text="▶")
             self.is_playing = False
-            
+
     def update_slider_loop(self):
         """Оновлення слайдера з урахуванням перемотки та перевіркою на існування вікна"""
         # 1. ПЕРЕВІРКА: Якщо вікна немає або воно закривається — негайно зупиняємо цикл
@@ -185,3 +187,45 @@ class MainController:
         if self.is_playing:
             pygame.mixer.music.load(self.model.current_path)
             pygame.mixer.music.play(start=self.current_seconds)
+        
+    def play_selected_segment(self):
+        """Грає тільки виділений у таблиці шматочок"""
+        import pygame
+        
+        # 1. Отримуємо виділений рядок
+        selected_item = self.editor.table.selection()
+        if not selected_item:
+            messagebox.showinfo("Інфо", "Спочатку виберіть сегмент у таблиці!")
+            return
+            
+        # 2. Беремо дані сегмента (час початку та кінця)
+        values = self.editor.table.item(selected_item)['values']
+        start_s = float(values[0])
+        end_s = float(values[1])
+        duration_s = end_s - start_s
+        
+        if duration_s <= 0: return
+
+        # 3. Зупиняємо все, що грало, і мотаємо на початок сегмента
+        pygame.mixer.music.stop()
+        self.current_seconds = start_s
+        self.is_playing = True
+        self.editor.play_pause_btn.configure(text="⏸")
+        
+        # 4. Запускаємо відтворення
+        pygame.mixer.music.load(self.model.current_path)
+        pygame.mixer.music.play(start=start_s)
+        
+        # 5. Створюємо таймер, який зупинить музику через duration_s секунд
+        # Ми використовуємо after, щоб автоматично натиснути паузу в кінці сегмента
+        self.editor.after(int(duration_s * 1000), self.stop_segment_playback)
+
+    def stop_segment_playback(self):
+        """Зупиняє програвання після завершення сегмента"""
+        import pygame
+        if self.is_playing: # Якщо користувач сам не натиснув паузу раніше
+            pygame.mixer.music.stop()
+            self.is_playing = False
+            self.editor.play_pause_btn.configure(text="▶")
+            # Оновлюємо current_seconds на кінець сегмента
+            # (або можна лишити на початку - як тобі зручніше)
