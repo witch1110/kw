@@ -2,6 +2,7 @@ from view.segmented_track_view import SegmentedTrackView
 from tkinter import messagebox
 import pygame
 import time
+from view.dialogs import CustomInputDialog
 
 class MainController:
     def __init__(self, model, view):
@@ -107,6 +108,8 @@ class MainController:
         self.editor.recalc_btn.configure(command=self.handle_resegmentation)
 
         self.editor.save_btn.configure(command=self.save_current_project)
+
+    
 
     def toggle_playback(self):
         import pygame
@@ -303,7 +306,7 @@ class MainController:
             messagebox.showerror("Помилка", f"Не вдалося зберегти: {e}")
 
     def open_library(self):
-        """Зчитує JSON-файли та передає їх у LibraryWindow"""
+        """Зчитує JSON-файли та відкриває бібліотеку"""
         import os
         import json
         from view.library_view import LibraryWindow
@@ -311,6 +314,7 @@ class MainController:
         library_path = "library"
         real_saved_tracks = []
 
+        # 1. Збираємо дані з папки
         if os.path.exists(library_path):
             files = [f for f in os.listdir(library_path) if f.endswith('.json')]
             for index, file_name in enumerate(files):
@@ -325,16 +329,20 @@ class MainController:
                             "full_data": data 
                         })
                 except Exception as e:
-                    print(f"Помилка: {e}")
+                    print(f"Помилка зчитування {file_name}: {e}")
 
-        # Створюємо вікно та ОНОВЛЮЄМО його дані
+        # 2. Створюємо вікно ОДИН раз
         self.lib_win = LibraryWindow(self.view)
-        self.lib_win.saved_tracks = real_saved_tracks # Передаємо реальні дані замість заглушок
-        self.lib_win.render_library() # Викликаємо перемальовування карток
+        
+        # 3. Передаємо дані
+        self.lib_win.saved_tracks = real_saved_tracks
+        self.lib_win.render_library() 
+        
+        # 4. Прив'язуємо функції (Зверни увагу на назви кнопок!)
+        self.lib_win.load_project_to_editor = self.load_saved_project #
+        self.lib_win.export_btn.configure(command=self.export_project_from_library) #
+        
         self.view.withdraw()
-
-        # Кажемо вікну бібліотеки: "Коли захочеш завантажити проект — клич цей метод контролера"
-        self.lib_win.load_project_to_editor = self.load_saved_project
 
     def load_saved_project(self, track_item):
         """Відкриває збережений проект з бібліотеки в редакторі"""
@@ -380,3 +388,131 @@ class MainController:
             self.open_editor()
         else:
             messagebox.showerror("Помилка", "Не вдалося завантажити аудіо.")
+
+    def export_segments(self):
+        """Нарізає аудіо на сегменти та зберігає у папку exports"""
+        import os
+        import csv
+        from pydub import AudioSegment
+        from tkinter import messagebox, filedialog
+
+        # 1. Перевірки
+        if not self.model.segments or not self.model.current_path:
+            messagebox.showwarning("Експорт", "Немає сегментів для експорту!")
+            return
+
+        # 2. Вибір папки для збереження
+        output_base_dir = filedialog.askdirectory(title="Оберіть папку для експорту датасету")
+        if not output_base_dir:
+            return
+
+        # Створюємо підпапку з іменем треку
+        track_name = os.path.basename(self.model.current_path).rsplit('.', 1)[0]
+        export_path = os.path.join(output_base_dir, f"dataset_{track_name}")
+        
+        if not os.path.exists(export_path):
+            os.makedirs(export_path)
+
+        try:
+            # 3. Завантажуємо аудіо через pydub
+            audio = AudioSegment.from_file(self.model.current_path)
+            
+            manifest_data = [] # Для CSV файлу з описом
+
+            # 4. Процес нарізки
+            for i, seg in enumerate(self.model.segments):
+                # pydub працює в мілісекундах
+                start_ms = seg.start * 1000
+                end_ms = seg.end * 1000
+                
+                # Вирізаємо шматок
+                chunk = audio[start_ms:end_ms]
+                
+                # Формуємо ім'я файлу (наприклад: 01_INTRO_trackname.wav)
+                safe_label = "".join(x for x in seg.label if x.isalnum() or x in "._- ").strip()
+                chunk_filename = f"{i+1:02d}_{safe_label}.wav"
+                chunk_path = os.path.join(export_path, chunk_filename)
+                
+                # Зберігаємо сегмент у форматі WAV (найкраще для ML)
+                chunk.export(chunk_path, format="wav")
+                
+                # Додаємо запис у маніфест
+                manifest_data.append([chunk_filename, seg.label, seg.start, seg.end])
+
+            # 5. Створюємо CSV файл з метаданими (Manifest)
+            csv_path = os.path.join(export_path, "metadata.csv")
+            with open(csv_path, "w", newline='', encoding="utf-8") as f:
+                writer = csv.writer(f)
+                writer.writerow(["filename", "label", "start_sec", "end_sec"])
+                writer.writerows(manifest_data)
+
+            messagebox.showinfo("Успіх", f"Датасет сформовано!\nЗбережено {len(self.model.segments)} сегментів у:\n{export_path}")
+
+        except Exception as e:
+            messagebox.showerror("Помилка експорту", f"Сталася помилка: {str(e)}")
+
+    def export_project_from_library(self):
+        """Масовий експорт: створення спільної папки датасету з підпапкою аудіо та CSV"""
+        import os
+        import csv
+        import shutil
+        from tkinter import messagebox, filedialog, simpledialog
+
+        # 1. Знаходимо обрані проекти
+        selected_projects = [
+            t for t in self.lib_win.saved_tracks 
+            if self.lib_win.check_vars[t['id']].get()
+        ]
+
+        if not selected_projects:
+            messagebox.showwarning("Експорт", "Виберіть проекти галочкою!")
+            return
+
+        # 2. Питаємо назву для головної папки датасету
+        dialog = CustomInputDialog(self.lib_win, "Створення датасету", "Введіть назву датасету:")
+        dataset_name = dialog.get_input()
+        if not dataset_name: return
+
+        # 3. Вибір місця, де створити цю папку
+        base_location = filedialog.askdirectory(title="Оберіть місце для збереження")
+        if not base_location: return
+
+        # Формуємо шлях до головної папки та підпапок
+        root_dir = os.path.join(base_location, dataset_name)
+        audio_dir = os.path.join(root_dir, "tracks")
+        
+        try:
+            # Створюємо структуру
+            os.makedirs(audio_dir, exist_ok=True)
+
+            all_annotations = []
+
+            for project in selected_projects:
+                data = project['full_data']
+                original_audio = data.get("audio_path")
+                
+                if original_audio and os.path.exists(original_audio):
+                    file_name = os.path.basename(original_audio)
+                    # Копіюємо трек у root_dir/tracks/
+                    shutil.copy2(original_audio, os.path.join(audio_dir, file_name))
+                    
+                    # Додаємо всі сегменти цього треку до списку
+                    for seg in data.get("segments", []):
+                        all_annotations.append({
+                            "file_name": file_name,
+                            "label": seg.get('label', 'PART'),
+                            "start": seg.get('start', 0),
+                            "end": seg.get('end', 0)
+                        })
+
+            # 4. Створюємо CSV всередині головної папки
+            csv_path = os.path.join(root_dir, "annotations.csv")
+            with open(csv_path, "w", newline='', encoding="utf-8") as f:
+                writer = csv.DictWriter(f, fieldnames=["file_name", "label", "start", "end"])
+                writer.writeheader()
+                writer.writerows(all_annotations)
+
+            messagebox.showinfo("Успіх", f"Датасет '{dataset_name}' готовий!\nШлях: {root_dir}")
+
+        except Exception as e:
+            messagebox.showerror("Помилка", f"Не вдалося створити структуру датасету: {e}")
