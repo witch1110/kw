@@ -8,7 +8,17 @@ class LibraryWindow(ctk.CTkToplevel):
         self.grab_set() 
 
         self.title("Audio Archive - Library")
-        self.geometry("950x700")
+        self.geometry("950x700") 
+        self.update_idletasks()
+        
+        screen_width = self.winfo_screenwidth()
+        screen_height = self.winfo_screenheight()
+        
+        x = (screen_width // 2) - (950 // 2)
+        y = (screen_height // 2) - (700 // 2)
+        
+        self.geometry(f"950x700+{x}+{y}")
+
         
         # Кольори
         self.bg_color = "#121212"
@@ -130,7 +140,7 @@ class LibraryWindow(ctk.CTkToplevel):
         """Це заглушка, яку контролер замінить на реальний метод"""
         # Якщо контролер не підмінив цей метод, просто виведемо інфо
         print(f"Завантаження проекту: {track_data['name']}")
-        
+
     def select_all(self):
         for var in self.check_vars.values(): var.set(True)
 

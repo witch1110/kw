@@ -15,6 +15,8 @@ class SegmentedTrackView(ctk.CTkToplevel):
 
         self.title("AUDIO ANALYZER PRO - EDITOR")
         self.geometry("1250x900")
+
+        self.after(0, lambda: self.state('zoomed'))
         
         # Колірна палітра "Cyber Dark"
         self.bg_color = "#0B0B0C"

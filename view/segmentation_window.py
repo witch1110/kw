@@ -14,6 +14,20 @@ class AudioUploadWindow(ctk.CTkToplevel):
 
         self.title("Завантаження аудіо для сегментації")
         self.geometry("600x600")
+
+        window_width = 600
+        window_height = 600
+        
+        # Отримуємо розміри екрана користувача
+        screen_width = self.winfo_screenwidth()
+        screen_height = self.winfo_screenheight()
+        
+        # Обчислюємо координати для центру
+        x = (screen_width // 2) - (window_width // 2)
+        y = (screen_height // 2) - (window_height // 2)
+        
+        # Встановлюємо розмір і позицію
+        self.geometry(f"{window_width}x{window_height}+{x}+{y}")
         
         # Змінна для зберігання шляху до файлу
         self.selected_file_path = None

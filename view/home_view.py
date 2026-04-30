@@ -13,6 +13,20 @@ class MainMenu(ctk.CTk):
         # Налаштування вікна
         self.title("Audio Segmenter Pro")
         self.geometry("800x500")
+
+        window_width = 800
+        window_height = 500
+        
+        # Отримуємо розміри екрана користувача
+        screen_width = self.winfo_screenwidth()
+        screen_height = self.winfo_screenheight()
+        
+        # Обчислюємо координати для центру
+        x = (screen_width // 2) - (window_width // 2)
+        y = (screen_height // 2) - (window_height // 2)
+        
+        # Встановлюємо розмір і позицію
+        self.geometry(f"{window_width}x{window_height}+{x}+{y}")
         
         # Робимо так, щоб вміст центрувався
         self.grid_columnconfigure(0, weight=1)
