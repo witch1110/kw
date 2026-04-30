@@ -111,6 +111,13 @@ class AudioUploadWindow(ctk.CTkToplevel):
         
         self.back_btn.pack(pady=10)
 
+        self.protocol("WM_DELETE_WINDOW", self.on_closing)
+
+# В кінці класу
+    def on_closing(self):
+        self.parent.deiconify() # Показуємо головне вікно назад
+        self.destroy()
+
     def choose_file(self):
         # Відкриваємо діалогове вікно для вибору файлу
         file_path = filedialog.askopenfilename(

@@ -99,8 +99,12 @@ class LibraryWindow(ctk.CTkToplevel):
 
         self.render_library()
 
-    # Методи (render_library, create_track_card, select_all, deselect_all, export_selected) 
-    # залишаються без змін...
+        self.protocol("WM_DELETE_WINDOW", self.on_closing)
+
+    def on_closing(self):
+        self.parent.deiconify() # Повертаємо головне вікно
+        self.destroy()
+
     def render_library(self):
         for widget in self.scrollable_frame.winfo_children():
             widget.destroy()

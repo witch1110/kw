@@ -175,7 +175,15 @@ class SegmentedTrackView(ctk.CTkToplevel):
         for c in cols: self.table.column(c, anchor="center")
         self.table.pack(fill="both", expand=True, padx=15, pady=15)
         self.table.bind("<Double-1>", self._on_edit)
+        self.protocol("WM_DELETE_WINDOW", self.on_closing)
 
+    def on_closing(self):
+        import pygame
+        if pygame.mixer.get_init():
+            pygame.mixer.music.stop() # Зупиняємо звук
+        self.master.deiconify()
+        self.destroy()
+        
     def _plot_spectrogram(self, signal=None, sr=None):
         if hasattr(self, 'canvas'):
             self.canvas.get_tk_widget().destroy()
