@@ -17,27 +17,34 @@ class MainController:
         self.seg_win.run_btn.configure(command=self.handle_processing)
 
     def handle_processing(self):
-        """Обробка натискання кнопки СЕГМЕНТУВАТИ"""
+        """Обробка вибору методу та запуск вікна редактора"""
         path = getattr(self.seg_win, 'selected_file_path', None)
         
         if not path:
             messagebox.showwarning("Помилка", "Ви не обрали файл!")
             return
 
+        # ОТРИМУЄМО ОБРАНИЙ МЕТОД З МЕНЮ
         method = self.seg_win.method_var.get()
+        print(f"Обрано метод: {method}") # Для самоперевірки в консолі
+
         self.seg_win.run_btn.configure(text="⏳ ОБРОБКА...", state="disabled")
         self.seg_win.update() 
 
         if self.model.load_from_file(path):
             self.model.current_path = path 
             
+            # ВИБІР АЛГОРИТМУ
             if "Librosa" in method:
                 self.model.segment_librosa_onset()
             elif "Novelty" in method:
                 self.model.segment_novelty()
             else:
-                self.model.segment_ml()
+                # Поки ML не готовий, нехай буде novelty або повідомлення
+                print("ML ще в розробці, запускаю Novelty за замовчуванням")
+                self.model.segment_novelty()
 
+            # Закриваємо допоміжні вікна та відкриваємо редактор
             self.seg_win.withdraw() 
             self.view.withdraw()    
             self.open_editor()
@@ -45,7 +52,7 @@ class MainController:
         else:
             messagebox.showerror("Помилка", "Не вдалося завантажити файл.")
             self.seg_win.run_btn.configure(text="🚀 СЕГМЕНТУВАТИ", state="normal")
-
+            
     def open_editor(self):
         """Створює і наповнює вікно редактора з робочим плеєром та перемоткою"""
         import pygame
